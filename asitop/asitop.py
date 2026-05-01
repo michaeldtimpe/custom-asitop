@@ -1,8 +1,22 @@
 import time
 import argparse
 from collections import deque
-from dashing import VSplit, HSplit, HGauge, HChart, VGauge
+from dashing import VSplit, HSplit, HGauge, HChart, VGauge, ColorRangeVGauge
 from .utils import *
+
+PROCESSOR_COLOR = 6
+MEMORY_COLOR = 3
+POWER_COLOR = 2
+SEVERITY_RAMP = ((50, 2), (80, 3), (100, 1))
+
+
+def severity_color(pct, low):
+    if pct >= 80:
+        return 1
+    if pct >= 50:
+        return 3
+    return low
+
 
 parser = argparse.ArgumentParser(
     description='asitop: Performance monitoring CLI tool for Apple Silicon')
@@ -27,22 +41,22 @@ def main():
     print("\n[1/3] Loading ASITOP\n")
     print("\033[?25l")
 
-    cpu1_gauge = HGauge(title="E-CPU Usage", val=0, color=args.color)
-    cpu2_gauge = HGauge(title="P-CPU Usage", val=0, color=args.color)
-    gpu_gauge = HGauge(title="GPU Usage", val=0, color=args.color)
-    ane_gauge = HGauge(title="ANE", val=0, color=args.color)
+    cpu1_gauge = HGauge(title="E-CPU Usage", val=0, color=PROCESSOR_COLOR)
+    cpu2_gauge = HGauge(title="P-CPU Usage", val=0, color=PROCESSOR_COLOR)
+    gpu_gauge = HGauge(title="GPU Usage", val=0, color=PROCESSOR_COLOR)
+    ane_gauge = HGauge(title="ANE", val=0, color=PROCESSOR_COLOR)
     gpu_ane_gauges = [gpu_gauge, ane_gauge]
 
     soc_info_dict = get_soc_info()
     e_core_count = soc_info_dict["e_core_count"]
-    e_core_gauges = [VGauge(val=0, color=args.color, border_color=args.color) for _ in range(e_core_count)]
+    e_core_gauges = [ColorRangeVGauge(val=0, colormap=SEVERITY_RAMP, border_color=PROCESSOR_COLOR) for _ in range(e_core_count)]
     p_core_count = soc_info_dict["p_core_count"]
-    p_core_gauges = [VGauge(val=0, color=args.color, border_color=args.color) for _ in range(min(p_core_count, 8))]
+    p_core_gauges = [ColorRangeVGauge(val=0, colormap=SEVERITY_RAMP, border_color=PROCESSOR_COLOR) for _ in range(min(p_core_count, 8))]
     p_core_split = [HSplit(
         *p_core_gauges,
     )]
     if p_core_count > 8:
-        p_core_gauges_ext = [VGauge(val=0, color=args.color, border_color=args.color) for _ in range(p_core_count - 8)]
+        p_core_gauges_ext = [ColorRangeVGauge(val=0, colormap=SEVERITY_RAMP, border_color=PROCESSOR_COLOR) for _ in range(p_core_count - 8)]
         p_core_split.append(HSplit(
             *p_core_gauges_ext,
         ))
@@ -58,10 +72,10 @@ def main():
     processor_split = VSplit(
         *processor_gauges,
         title="Processor Utilization",
-        border_color=args.color,
+        border_color=PROCESSOR_COLOR,
     )
 
-    ram_gauge = HGauge(title="RAM Usage", val=0, color=args.color)
+    ram_gauge = HGauge(title="RAM Usage", val=0, color=MEMORY_COLOR)
     """
     ecpu_bw_gauge = HGauge(title="E-CPU B/W", val=50, color=args.color)
     pcpu_bw_gauge = HGauge(title="P-CPU B/W", val=50, color=args.color)
@@ -85,22 +99,22 @@ def main():
     memory_gauges = VSplit(
         ram_gauge,
         #*bw_gauges,
-        border_color=args.color,
+        border_color=MEMORY_COLOR,
         title="Memory"
     )
 
-    cpu_power_chart = HChart(title="CPU Power", color=args.color)
-    gpu_power_chart = HChart(title="GPU Power", color=args.color)
+    cpu_power_chart = HChart(title="CPU Power", color=POWER_COLOR)
+    gpu_power_chart = HChart(title="GPU Power", color=POWER_COLOR)
     power_charts = VSplit(
         cpu_power_chart,
         gpu_power_chart,
         title="Power Chart",
-        border_color=args.color,
+        border_color=POWER_COLOR,
     ) if args.show_cores else HSplit(
         cpu_power_chart,
         gpu_power_chart,
         title="Power Chart",
-        border_color=args.color,
+        border_color=POWER_COLOR,
     )
 
     ui = HSplit(
@@ -276,6 +290,8 @@ def main():
                             "GB"
                         ])
                     ram_gauge.value = ram_metrics_dict["free_percent"]
+                    ram_used_pct = 100 - ram_metrics_dict["free_percent"]
+                    ram_gauge.color = severity_color(ram_used_pct, MEMORY_COLOR)
 
                     """
 
@@ -380,6 +396,7 @@ def main():
                         "W)"
                     ])
                     cpu_power_chart.append(cpu_power_percent)
+                    cpu_power_chart.color = severity_color(cpu_power_percent, POWER_COLOR)
 
                     gpu_power_percent = int(
                         cpu_metrics_dict["gpu_W"] / args.interval / gpu_max_power * 100)
@@ -398,6 +415,7 @@ def main():
                         "W)"
                     ])
                     gpu_power_chart.append(gpu_power_percent)
+                    gpu_power_chart.color = severity_color(gpu_power_percent, POWER_COLOR)
 
                     ui.display()
 
