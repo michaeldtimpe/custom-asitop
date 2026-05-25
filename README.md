@@ -4,6 +4,11 @@
 
 Performance monitoring CLI tool for Apple Silicon
 
+> **This is a personal fork** of [tlkh/asitop](https://github.com/tlkh/asitop)
+> with a color scheme matched to [llmtop](https://github.com/michaeldtimpe/llmtop).
+> See [Building a deploy package](#building-a-deploy-package-this-fork) below to
+> regenerate the installable wheel/sdist for another Mac.
+
 ![](images/asitop.png)
 
 ```shell
@@ -83,6 +88,25 @@ Some information is guesstimate and hardcoded as there doesn't seem to be a offi
 ## Why
 
 Because I didn't find something like this online. Also, just curious about stuff.
+
+## Building a deploy package (this fork)
+
+The version is set in `setup.py` (`version='0.0.22'`). To build the installable
+wheel + sdist and deploy to another Apple Silicon Mac:
+
+```shell
+python3 -m pip install --upgrade build
+python3 -m build                 # writes dist/asitop-0.0.22-py3-none-any.whl + .tar.gz
+
+# install on the target Mac (pipx recommended — isolated, adds asitop to PATH)
+brew install pipx
+pipx install ./dist/asitop-0.0.22-py3-none-any.whl
+
+sudo asitop                      # sudo required: powermetrics needs root
+```
+
+`dist/` is gitignored, so the built artifacts are not tracked here — rebuild
+them with the command above when you need a fresh deploy package.
 
 ## Disclaimers
 
